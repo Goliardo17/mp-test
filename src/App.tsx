@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Location, useLocationsStore } from "./store/useLocationsStore";
+import "./app.css"
 
 export default function App() {
   return (
@@ -12,15 +13,9 @@ export default function App() {
 const TestLocationsList = () => {
   const [locationsList, setLocationsList] = useState<Partial<Location>[]>([{}]);
   const store = useLocationsStore()
-  console.log(locationsList)
 
   const getStore = async () => {
     await store.fetch()
-  }
-
-  const delItem = (ix: any) => {
-    const newList = locationsList.filter((_item, index) => index !== ix)
-    setLocationsList(newList)
   }
 
   useEffect(() => {
@@ -29,60 +24,62 @@ const TestLocationsList = () => {
 
   useEffect(() => {
     if (store.isLoaded) setLocationsList(store.locations)
-  }, [store])
+  }, [store.isLoaded, store.locations])
 
   return (
     <>
-      {locationsList.map((_location, index) => (
-        <TestLocationForm key={`location-${index}`} index={index} del={delItem}/>
-      ))}
+      <ul className="location-list">
+        {locationsList.map((_location, index) => (
+          <TestLocationForm key={`location-${index}`} index={index} />
+        ))}
+      </ul>
 
       <button
         type="button"
+        className="add"
         onClick={() => {
           setLocationsList((locationsList) => [...locationsList, {}]);
         }}
       >
+        <i className="fa-solid fa-plus" style={{ color: "#00aaff" }}></i>
         Добавить тестовую локацию
-      </button>
-
-      <button
-        onClick={() => {
-          console.log(locationsList);
-        }}
-      >
-        Вывести результат в консоль
       </button>
     </>
   );
 };
 
-const TestLocationForm: React.FC<any> = ({ index, del }) => {
-  const [selectedLocation, setSelectedLocation] = useState<any>()
-  const [selectedServevr, setSelectedServer] = useState<any>()
-  const [serversList, setServersList] = useState<any[]>([])
+interface TestLocationFormProps {
+  index: number;
+}
+
+const TestLocationForm: React.FC<TestLocationFormProps> = React.memo(({ index }) => {
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [selectedServer, setSelectedServer] = useState<string | null>(null);
+  const [hint, setHint] = useState<string>('');
   const store = useLocationsStore();
 
-  const changeServersList = (loc: string, env: string) => {
-    if (!store.servers) return
+  const serversList = useMemo(() => {
+    if (!store.servers || !selectedLocation || !selectedServer) {
+      return [];
+    }
 
-    const listFiltered = store.servers.filter((server) => (
-      server.environmentID == Number(env) && server.locationID == Number(loc)
-    ))
+    return store.servers.filter(
+      (server) =>
+        server.environmentID === Number(selectedServer) &&
+        server.locationID === Number(selectedLocation)
+    );
+  }, [store.servers, selectedLocation, selectedServer]);
 
-    setServersList(listFiltered)
-  }
+  const changeLocation = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedLocation(e.target.value === "---" ? null : e.target.value);
+  };
 
-  const changeLocation = (e: any) => {
-    const value = e.target.value
-    setSelectedLocation(value)
-    changeServersList(value, selectedServevr)
-  }
+  const changeServer = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedServer(e.target.value === "---" ? null : e.target.value);
+  };
 
-  const changeServer = (e: any) => {
-    const value = e.target.value
-    setSelectedServer(value)
-    changeServersList(selectedLocation, value)
+  const log = () => {
+    console.log('log', [{ locationID: selectedLocation, environmentID: selectedServer, hint: hint }])
   }
 
   if (!store.isLoaded) {
@@ -90,45 +87,68 @@ const TestLocationForm: React.FC<any> = ({ index, del }) => {
   }
 
   return (
-    <div>
-      <h4>Тестовая локация {index + 1}</h4>
-      <button onClick={() => del(index)}>Удалить</button>
+    <article className="location-container" onClick={log} >
+      <header className="a">
+        <i className="fa-solid fa-vial" />
+        <h4>Тестовая локация {index + 1}</h4>
+      </header>
 
-      <div>
+      <button className="location-delete" aria-label={`Удалить тестовую локацию ${index + 1}`}>
+        <i className="fa-solid fa-trash-can" style={{ color: "#e70808" }}></i>
+      </button>
+
+      <section className="settings">
         <label>Локация
-          <select onChange={changeLocation}>
-            <option value="---">-</option>
-            {
-              store.locations.map((loc) => (
-                <option key={loc.locationID} value={loc.locationID}>{loc.name}</option>
-              ))
-            }
-          </select>
+          <div className="label-container" onClick={(e) => e.stopPropagation()}>
+            <i className="fa-solid fa-location-dot" />
+            <select onChange={changeLocation} value={selectedLocation || "-"}>
+              <option value="-">-</option>
+              {
+                store.locations.map((loc) => (
+                  <option key={loc.locationID} value={String(loc.locationID)}>{loc.name}</option>
+                ))
+              }
+            </select>
+          </div>
         </label>
 
         <label>Среда
-          <select onChange={changeServer}>
-            <option value="---">-</option>
-            {
-              store.environments.map((env) => (
-                <option key={env.environmentID} value={env.environmentID}>{env.name}</option>
-              ))
-            }
-          </select>
+          <div className="label-container" onClick={(e) => e.stopPropagation()}>
+            <i className="fa-brands fa-envira" />
+            <select onChange={changeServer} value={selectedServer || "-"}>
+              <option value="-">-</option>
+              {
+                store.environments.map((env) => (
+                  <option key={env.environmentID} value={String(env.environmentID)}>{env.name}</option>
+                ))
+              }
+            </select>
+          </div>
         </label>
 
-        <label>Серверы
+        <label className="servers">Серверы
+          <i className="fa-solid fa-server" />
           <ul>
             {
-              serversList.map((server) => <li key={server.serverID}>{server.name}</li>)
+              serversList.map((server, ix) => (
+                <li key={server.serverID}>{server.name}{serversList.length - 1 > ix ? ',' : null}</li>
+              ))
             }
           </ul>
         </label>
-      </div>
+      </section>
 
       <label>Подсказка
-        <input type="Комментарий по локации" />
+        <div className="label-container" onClick={(e) => e.stopPropagation()}>
+          <i className="fa-solid fa-question" />
+          <input
+            placeholder="Комментарии к проекту"
+            type="text"
+            aria-label="Комментарии к проекту"
+            onChange={(e) => setHint(e.target.value)}
+          />
+        </div>
       </label>
-    </div>
+    </article>
   );
-};
+});
