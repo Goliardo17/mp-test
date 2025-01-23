@@ -8,7 +8,8 @@ if (!container)
   throw new Error("Can't start the application: div#root not found");
 
 createRoot(container).render(
-  <StrictMode>
+  // <StrictMode>
     <App />
-  </StrictMode>,
+  // </StrictMode>
+  ,
 );
